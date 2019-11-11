@@ -91,6 +91,7 @@ func (rc *OneByteWriteConn) SetReadDeadline(t time.Time) error {
 	return rc.conn.SetReadDeadline(t)
 }
 
+// OneByteReadConn sets the delay for read operations.
 type OneByteReadConn struct {
 	reader io.Reader
 	conn   net.Conn
@@ -441,5 +442,106 @@ func (rc *DelayConn) SetReadDeadline(t time.Time) error {
 // some of the data was successfully written.
 // A zero value for t means Write will not time out.
 func (rc *DelayConn) SetWriteDeadline(t time.Time) error {
+	return rc.conn.SetWriteDeadline(t)
+}
+
+// PerWriteDelayConn implements the delay before Write.
+type PerWriteDelayConn struct {
+	delay time.Duration
+	conn  net.Conn
+}
+
+// NewPerWriteDelayConn returns a new PerWriteDelayConn.
+func NewPerWriteDelayConn(delay time.Duration, conn net.Conn) *PerWriteDelayConn {
+	return &PerWriteDelayConn{
+		delay: delay,
+		conn:  conn,
+	}
+}
+
+// Read reads data from the connection.
+// Read can be made to time out and return an Error with Timeout() == true
+// after a fixed time limit; see SetDeadline and SetReadDeadline.
+func (rc *PerWriteDelayConn) Read(b []byte) (n int, err error) {
+	return rc.conn.Read(b)
+}
+
+// Write writes data to the connection.
+// Write can be made to time out and return an Error with Timeout() == true
+// after a fixed time limit; see SetDeadline and SetWriteDeadline.
+func (rc *PerWriteDelayConn) Write(b []byte) (n int, err error) {
+	if rc.delay > 0 {
+		var (
+			nw  int
+			err error
+		)
+		for i := range b {
+			time.Sleep(rc.delay)
+			nw, err = rc.conn.Write(b[i : i+1])
+			n += nw
+			if err != nil {
+				return nw, err
+			}
+		}
+		return nw, nil
+	}
+	return rc.conn.Write(b)
+}
+
+// Close closes the connection.
+// Any blocked Read or Write operations will be unblocked and return errors.
+func (rc *PerWriteDelayConn) Close() error {
+	return rc.conn.Close()
+}
+
+// LocalAddr returns the local network address.
+func (rc *PerWriteDelayConn) LocalAddr() net.Addr {
+	return rc.conn.LocalAddr()
+}
+
+// RemoteAddr returns the remote network address.
+func (rc *PerWriteDelayConn) RemoteAddr() net.Addr {
+	return rc.conn.RemoteAddr()
+}
+
+// SetDeadline sets the read and write deadlines associated
+// with the connection. It is equivalent to calling both
+// SetReadDeadline and SetWriteDeadline.
+//
+// A deadline is an absolute time after which I/O operations
+// fail with a timeout (see type Error) instead of
+// blocking. The deadline applies to all future and pending
+// I/O, not just the immediately following call to Read or
+// Write. After a deadline has been exceeded, the connection
+// can be refreshed by setting a deadline in the future.
+//
+// An idle timeout can be implemented by repeatedly extending
+// the deadline after successful Read or Write calls.
+//
+// A zero value for t means I/O operations will not time out.
+//
+// Note that if a TCP connection has keep-alive turned on,
+// which is the default unless overridden by Dialer.KeepAlive
+// or ListenConfig.KeepAlive, then a keep-alive failure may
+// also return a timeout error. On Unix systems a keep-alive
+// failure on I/O can be detected using
+// errors.Is(err, syscall.ETIMEDOUT).
+func (rc *PerWriteDelayConn) SetDeadline(t time.Time) error {
+	return rc.conn.SetDeadline(t)
+}
+
+// SetReadDeadline sets the deadline for future Read calls
+// and any currently-blocked Read call.
+// A zero value for t means Read will not time out.
+func (rc *PerWriteDelayConn) SetReadDeadline(t time.Time) error {
+	return rc.conn.SetReadDeadline(t)
+}
+
+// SetWriteDeadline sets the deadline for future Write calls
+// and any currently-blocked Write call.
+// Even if write times out, it may return n > 0, indicating that
+// some of the data was successfully written.
+// A zero value for t means Write will not time out.
+func (rc *PerWriteDelayConn) SetWriteDeadline(t time.Time) error {
 	return rc.conn.SetWriteDeadline(t)
 }
