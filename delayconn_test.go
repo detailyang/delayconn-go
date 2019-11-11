@@ -78,3 +78,15 @@ func TestOneByteReadConn(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 1, n)
 }
+
+func TestPerWriteDelayConn(t *testing.T) {
+	r := bytes.NewBuffer([]byte("haha"))
+	w := bytes.NewBuffer(nil)
+	rwc := &rwconn{r, w}
+
+	var c [1024]byte
+	ww := NewPerWriteDelayConn(1*time.Millisecond, rwc)
+	n, err := ww.Write(c[:])
+	require.Nil(t, err)
+	require.Equal(t, 1024, n)
+}
