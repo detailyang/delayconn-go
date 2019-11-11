@@ -483,7 +483,7 @@ func (rc *PerWriteDelayConn) Write(b []byte) (n int, err error) {
 				return nw, err
 			}
 		}
-		return nw, nil
+		return n, nil
 	}
 	return rc.conn.Write(b)
 }
